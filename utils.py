@@ -8,9 +8,7 @@ from db_sqlite3 import add_user as sqlite_add_user
 from db_sqlite3 import recreate_tables
 
 
-def init_db(db_path: str = DEFAULT_DB_PATH, schema_path: str = "schema.sql") -> None:
-    # schema_path kept only for backward compatibility.
-    _ = schema_path
+def init_db(db_path: str = DEFAULT_DB_PATH) -> None:
     recreate_tables(db_path=db_path)
 
 
