@@ -87,6 +87,7 @@ class SQLiteDB:
         self,
         user_id: int,
         account_id: int,
+
         transaction_type: str,
         amount: float,
         currency: str,
