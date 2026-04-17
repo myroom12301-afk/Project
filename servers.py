@@ -1,17 +1,10 @@
 import sqlite3
-from contextlib import contextmanager
 
 DB_PATH = "finance.db"
 
-
-@contextmanager
-def get_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    try:
-        yield conn
-    finally:
-        conn.close()
+conn = sqlite3.connect(DB_PATH)
+conn.row_factory = sqlite3.Row
+conn.execute("PRAGMA foreign_keys = ON;")
 
 
 # ---------------------------------------------------------------------------
@@ -19,42 +12,39 @@ def get_connection():
 # ---------------------------------------------------------------------------
 
 def init_db():
-    with get_connection() as conn:
-        conn.execute("PRAGMA foreign_keys = ON;")
-        conn.executescript("""
-            CREATE TABLE IF NOT EXISTS users (
-                id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                username   VARCHAR NOT NULL,
-                balance    INTEGER DEFAULT 0,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            );
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS users (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            username   VARCHAR NOT NULL,
+            balance    INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
 
-            CREATE TABLE IF NOT EXISTS categories (
-                id        INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                name      VARCHAR NOT NULL,
-                type      BOOLEAN NOT NULL,        -- 1 = доход, 0 = расход
-                is_active BOOLEAN DEFAULT 1        -- soft delete flag
-            );
+        CREATE TABLE IF NOT EXISTS categories (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            name      VARCHAR NOT NULL,
+            type      BOOLEAN NOT NULL,        -- 1 = доход, 0 = расход
+            is_active BOOLEAN DEFAULT 1        -- soft delete flag
+        );
 
-            CREATE TABLE IF NOT EXISTS transactions (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                category_id INTEGER NOT NULL REFERENCES categories(id),
-                type        BOOLEAN NOT NULL,      -- 1 = доход, 0 = расход
-                amount      INTEGER NOT NULL,      -- в копейках
-                description VARCHAR,
-                created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
-            );
+        CREATE TABLE IF NOT EXISTS transactions (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            category_id INTEGER NOT NULL REFERENCES categories(id),
+            type        BOOLEAN NOT NULL,      -- 1 = доход, 0 = расход
+            amount      INTEGER NOT NULL,      -- в копейках
+            description VARCHAR,
+            created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
 
-            -- индексы для быстрого поиска транзакций по пользователю и дате
-            CREATE INDEX IF NOT EXISTS idx_transactions_user_id
-                ON transactions(user_id);
+        -- индексы для быстрого поиска транзакций по пользователю и дате
+        CREATE INDEX IF NOT EXISTS idx_transactions_user_id
+            ON transactions(user_id);
 
-            CREATE INDEX IF NOT EXISTS idx_transactions_created_at
-                ON transactions(created_at);
-        """)
-        conn.commit()
+        CREATE INDEX IF NOT EXISTS idx_transactions_created_at
+            ON transactions(created_at);
+    """)
 
 
 # ---------------------------------------------------------------------------
@@ -69,13 +59,11 @@ def create_user(username: str) -> int:
     if not username or not username.strip():
         raise ValueError("username не может быть пустым")
 
-    with get_connection() as conn:
-        conn.execute("PRAGMA foreign_keys = ON;")
+    with conn:
         cursor = conn.execute(
             "INSERT INTO users (username) VALUES (?);",
             (username.strip(),)
         )
-        conn.commit()
         return cursor.lastrowid
 
 
@@ -90,17 +78,15 @@ def add_category(user_id: int, name: str, type: int) -> int:
     if not name or not name.strip():
         raise ValueError("name категории не может быть пустым")
 
-    with get_connection() as conn:
-        conn.execute("PRAGMA foreign_keys = ON;")
-        try:
+    try:
+        with conn:
             cursor = conn.execute(
                 "INSERT INTO categories (user_id, name, type) VALUES (?, ?, ?);",
                 (user_id, name.strip(), type)
             )
-            conn.commit()
             return cursor.lastrowid
-        except sqlite3.IntegrityError as e:
-            raise ValueError(f"Пользователь с id={user_id} не существует") from e
+    except sqlite3.IntegrityError as e:
+        raise ValueError(f"Пользователь с id={user_id} не существует") from e
 
 
 # ---------------------------------------------------------------------------
@@ -112,13 +98,11 @@ def delete_category(category_id: int) -> bool:
     Мягкое удаление категории — устанавливает is_active = 0.
     Возвращает True если запись найдена и обновлена, False иначе.
     """
-    with get_connection() as conn:
-        conn.execute("PRAGMA foreign_keys = ON;")
+    with conn:
         cursor = conn.execute(
             "UPDATE categories SET is_active = 0 WHERE id = ?;",
             (category_id,)
         )
-        conn.commit()
         return cursor.rowcount > 0
 
 
@@ -126,7 +110,7 @@ def delete_category(category_id: int) -> bool:
 # 5. add_transaction
 # ---------------------------------------------------------------------------
 
-def add_transaction():
+def add_transaction(user_id: int, category_id: int, type: int, amount: float, description: str = None):
     """
     Добавляет транзакцию и атомарно обновляет баланс пользователя.
 
@@ -140,14 +124,11 @@ def add_transaction():
     if amount <= 0:
         raise ValueError("amount должен быть положительным числом")
 
-    amount_coins = round(amount * 100)          # float → kopecks (INTEGER)
+    amount_coins = round(amount * 100)
     balance_delta = amount_coins if type == 1 else -amount_coins
 
-    with get_connection() as conn:
-        conn.execute("PRAGMA foreign_keys = ON;")
-        try:
-            conn.execute("BEGIN;")
-
+    try:
+        with conn:
             cursor = conn.execute(
                 """
                 INSERT INTO transactions (user_id, category_id, type, amount, description)
@@ -157,22 +138,16 @@ def add_transaction():
             )
             transaction_id = cursor.lastrowid
 
-            # Обновляем баланс пользователя в той же транзакции
             conn.execute(
                 "UPDATE users SET balance = balance + ? WHERE id = ?;",
                 (balance_delta, user_id)
             )
 
-            conn.execute("COMMIT;")
             return transaction_id
-        except sqlite3.IntegrityError as e:
-            conn.execute("ROLLBACK;")
-            raise ValueError(
-                f"Ошибка внешнего ключа (user_id={user_id}, category_id={category_id})"
-            ) from e
-        except Exception:
-            conn.execute("ROLLBACK;")
-            raise
+    except sqlite3.IntegrityError as e:
+        raise ValueError(
+            f"Ошибка внешнего ключа (user_id={user_id}, category_id={category_id})"
+        ) from e
 
 
 # ---------------------------------------------------------------------------
@@ -185,8 +160,7 @@ def get_user_transactions(user_id: int, limit: int = 50):
     Суммы возвращаются в рублях (делятся на 100).
     JOIN с categories для получения названия категории.
     """
-    with get_connection() as conn:
-        conn.execute("PRAGMA foreign_keys = ON;")
+    with conn:
         rows = conn.execute(
             """
             SELECT
@@ -205,7 +179,7 @@ def get_user_transactions(user_id: int, limit: int = 50):
             (user_id, limit)
         ).fetchall()
 
-        return [dict(row) for row in rows]
+    return [dict(row) for row in rows]
 
 
 # ---------------------------------------------------------------------------
@@ -222,8 +196,7 @@ def get_weekly_comparison(user_id: int) -> dict:
         prev_week_income,    prev_week_expense
     Все суммы в рублях.
     """
-    with get_connection() as conn:
-        conn.execute("PRAGMA foreign_keys = ON;")
+    with conn:
         row = conn.execute(
             """
             SELECT
@@ -259,12 +232,12 @@ def get_weekly_comparison(user_id: int) -> dict:
             (user_id,)
         ).fetchone()
 
-        return {
-            "current_week_income":  row["current_week_income"]  or 0.0,
-            "current_week_expense": row["current_week_expense"] or 0.0,
-            "prev_week_income":     row["prev_week_income"]     or 0.0,
-            "prev_week_expense":    row["prev_week_expense"]    or 0.0,
-        }
+    return {
+        "current_week_income":  row["current_week_income"]  or 0.0,
+        "current_week_expense": row["current_week_expense"] or 0.0,
+        "prev_week_income":     row["prev_week_income"]     or 0.0,
+        "prev_week_expense":    row["prev_week_expense"]    or 0.0,
+    } #Переделать эту часть при создании приложения
 
 
 # ---------------------------------------------------------------------------
@@ -276,8 +249,7 @@ def get_all_time_stats(user_id: int) -> dict:
     Возвращает суммарный доход и суммарный расход пользователя за всё время.
     Суммы в рублях.
     """
-    with get_connection() as conn:
-        conn.execute("PRAGMA foreign_keys = ON;")
+    with conn:
         row = conn.execute(
             """
             SELECT
@@ -289,7 +261,7 @@ def get_all_time_stats(user_id: int) -> dict:
             (user_id,)
         ).fetchone()
 
-        return {
-            "total_income":  row["total_income"]  or 0.0,
-            "total_expense": row["total_expense"] or 0.0,
-        }
+    return {
+        "total_income":  row["total_income"]  or 0.0,
+        "total_expense": row["total_expense"] or 0.0,
+    } #Переделать эту часть при создании приложения
