@@ -26,11 +26,12 @@ class FinanceRepository:
             );
 
             CREATE TABLE IF NOT EXISTS categories (
-                id        INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                name      TEXT NOT NULL,
-                type      INTEGER NOT NULL,
-                is_active INTEGER DEFAULT 1
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                name       TEXT NOT NULL,
+                type       INTEGER NOT NULL,
+                is_active  INTEGER DEFAULT 1,
+                is_default INTEGER DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS transactions (
@@ -51,6 +52,32 @@ class FinanceRepository:
             """
         )
         self.connection.commit()
+        # migrate: add is_default if it doesn't exist yet
+        try:
+            self.connection.execute("ALTER TABLE categories ADD COLUMN is_default INTEGER DEFAULT 0")
+            self.connection.commit()
+        except Exception:
+            pass
+        # migrate: mark seed categories as default if none are marked yet
+        unmarked = self.connection.execute(
+            "SELECT COUNT(*) FROM categories WHERE is_default = 1"
+        ).fetchone()[0]
+        if unmarked == 0 and self.connection.execute("SELECT COUNT(*) FROM categories").fetchone()[0] > 0:
+            seed_names_expense = ("Магазины", "АЗС", "Аптека", "Прочее")
+            seed_names_income = ("Зарплата", "Фриланс", "Кэшбек", "Прочее")
+            with self.connection:
+                self.connection.execute(
+                    "UPDATE categories SET is_default=1 WHERE type=0 AND name IN ({})".format(
+                        ",".join("?" * len(seed_names_expense))
+                    ),
+                    seed_names_expense,
+                )
+                self.connection.execute(
+                    "UPDATE categories SET is_default=1 WHERE type=1 AND name IN ({})".format(
+                        ",".join("?" * len(seed_names_income))
+                    ),
+                    seed_names_income,
+                )
 
     def _ensure_seed_data(self) -> None:
         stats_row = self.connection.execute(
@@ -86,17 +113,17 @@ class FinanceRepository:
             ).lastrowid
 
             categories = [
-                (user_id, "Зарплата", 1),
-                (user_id, "Фриланс", 1),
-                (user_id, "Кэшбек", 1),
-                (user_id, "Прочее", 1),
-                (user_id, "Магазины", 0),
-                (user_id, "АЗС", 0),
-                (user_id, "Аптека", 0),
-                (user_id, "Прочее", 0),
+                (user_id, "Зарплата", 1, 1),
+                (user_id, "Фриланс", 1, 1),
+                (user_id, "Кэшбек", 1, 1),
+                (user_id, "Прочее", 1, 1),
+                (user_id, "Магазины", 0, 1),
+                (user_id, "АЗС", 0, 1),
+                (user_id, "Аптека", 0, 1),
+                (user_id, "Прочее", 0, 1),
             ]
             self.connection.executemany(
-                "INSERT INTO categories (user_id, name, type) VALUES (?, ?, ?)",
+                "INSERT INTO categories (user_id, name, type, is_default) VALUES (?, ?, ?, ?)",
                 categories,
             )
 
@@ -163,7 +190,7 @@ class FinanceRepository:
 
     def get_categories(self, user_id: int, tx_type: int | None = None) -> list[sqlite3.Row]:
         query = """
-            SELECT id, name, type
+            SELECT id, name, type, is_default
             FROM categories
             WHERE user_id = ? AND is_active = 1
         """
@@ -171,8 +198,15 @@ class FinanceRepository:
         if tx_type is not None:
             query += " AND type = ?"
             params.append(tx_type)
-        query += " ORDER BY name"
+        query += " ORDER BY is_default DESC, name"
         return self.connection.execute(query, params).fetchall()
+
+    def add_category(self, user_id: int, name: str, tx_type: int) -> int:
+        with self.connection:
+            return self.connection.execute(
+                "INSERT INTO categories (user_id, name, type, is_default) VALUES (?, ?, ?, 0)",
+                (user_id, name, tx_type),
+            ).lastrowid
 
     def get_transactions(self, user_id: int, limit: int = 12) -> list[sqlite3.Row]:
         return self.connection.execute(
