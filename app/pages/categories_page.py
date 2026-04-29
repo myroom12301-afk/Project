@@ -12,6 +12,7 @@ _LABEL_TYPE = {"Расходы": EXPENSE, "Доходы": INCOME}
 
 class CategoriesPage(BasePage):
     def __init__(self, master, controller) -> None:
+<<<<<<< HEAD
         super().__init__(master, controller)
         self.grid_columnconfigure(0, weight=0)
         self.grid_columnconfigure(1, weight=1)
@@ -55,6 +56,13 @@ class CategoriesPage(BasePage):
             border_color="#2A3A50",
             text_color="#F7F8FC",
             placeholder_text_color="#5A6A7E",
+=======
+        super().__init__(
+            master,
+            controller,
+            title="Категории",
+          description="Отдельный файл страницы категорий. В него можно добавлять CRUD-логику категорий без перегрузки главного окна.",
+>>>>>>> 8ef6daf (commit)
         )
         self._name_entry.grid(row=2, column=0, padx=20, pady=(0, 16), sticky="ew")
 

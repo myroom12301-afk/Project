@@ -3,12 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import customtkinter as ctk
-
+import tkinter as tk
 try:
-    from PIL import Image, ImageDraw
+    import tksvg
 except ImportError:
-    Image = None
-    ImageDraw = None
+    tksvg = None
 
 from .components.sidebar_menu import SidebarMenu
 from .data.repository import FinanceRepository
@@ -27,12 +26,12 @@ ctk.set_default_color_theme("blue")
 class FinanceDashboardApp(ctk.CTk):
     SIDEBAR_ITEMS = ["Обзор", "Конверт", "Доходы", "Расходы", "Категории", "Настройки"]
     SIDEBAR_ICON_FILES = {
-        "Обзор": "overview.png",
-        "Конверт": "transfer.png",
-        "Доходы": "income.png",
-        "Расходы": "expense.png",
-        "Категории": "categories.png",
-        "Настройки": "settings.png",
+        "Обзор": "gemini-svg.svg",
+        "Конверт": "Group 12.svg",
+        "Доходы": "Vector (1).svg",
+        "Расходы": "fi-1.svg",
+        "Категории": "fi-rr-interactive.svg",
+        "Настройки": "Vector.svg",
     }
 
     def __init__(self) -> None:
@@ -44,9 +43,10 @@ class FinanceDashboardApp(ctk.CTk):
 
         self.repo = FinanceRepository(Path(__file__).resolve().parent.parent / "finance.db")
         self.user = self.repo.get_default_user()
-        self.assets_dir = Path(__file__).resolve().parent.parent / "assets" / "icons"
+        self.assets_dir = Path(__file__).resolve().parent.parent / "assets"
+        self.svg_images: dict[str, object | None] = {}
         self.sidebar_icons = self._load_sidebar_icons()
-        self.user_icon = self._load_icon("users.png", size=(40, 40), color="#10D6B3")
+        self.user_icon = self._load_icon("Vector (2).svg", size=(40, 40), color="#10D6B3")
         self.pages = {}
 
         self.grid_columnconfigure(1, weight=1)
@@ -93,18 +93,8 @@ class FinanceDashboardApp(ctk.CTk):
         self.sidebar.set_active(page_name)
         page.on_show()
 
-    def _create_icon_placeholder(self, size: tuple[int, int]) -> ctk.CTkImage | None:
-        if Image is None or ImageDraw is None:
-            return None
-
-        image = Image.new("RGBA", size, (0, 0, 0, 0))
-        draw = ImageDraw.Draw(image)
-        draw.rounded_rectangle((1, 1, size[0] - 2, size[1] - 2), radius=6, outline="#1ED3A7", width=2)
-        draw.line((6, size[1] // 2, size[0] - 6, size[1] // 2), fill="#1ED3A7", width=2)
-        return ctk.CTkImage(light_image=image, dark_image=image, size=size)
-
-    def _load_sidebar_icons(self) -> dict[str, dict[str, ctk.CTkImage | None]]:
-        icons = {}
+    def _load_sidebar_icons(self) -> dict[str, dict[str, object | None]]:
+        icons: dict[str, dict[str, object | None]] = {}
         for title, filename in self.SIDEBAR_ICON_FILES.items():
             icons[title] = {
                 "inactive": self._load_icon(filename, size=(22, 22), color="#8B95A5"),
@@ -112,29 +102,26 @@ class FinanceDashboardApp(ctk.CTk):
             }
         return icons
 
-    def _load_icon(self, filename: str, size: tuple[int, int], color: str) -> ctk.CTkImage | None:
-        if Image is None:
+    def _load_icon(self, filename: str, size: tuple[int, int], color: str) -> object | None:
+        if tksvg is None:
             return None
 
         icon_path = self.assets_dir / filename
         if not icon_path.exists():
             return None
 
-        base = Image.open(icon_path).convert("RGBA")
-        alpha = base.getchannel("A")
-        bbox = alpha.getbbox()
-        if bbox:
-            base = base.crop(bbox)
+        image_key = f"{filename}:{size[0]}x{size[1]}:{color}"
+        cached_image = self.svg_images.get(image_key)
+        if cached_image is not None:
+            return cached_image
 
-        inner_size = (int(size[0] * 0.82), int(size[1] * 0.82))
-        base.thumbnail(inner_size, Image.Resampling.LANCZOS)
+        if not getattr(self, "_tksvg_loaded", False):
+            tksvg.load(self)
 
-        canvas = Image.new("RGBA", size, (0, 0, 0, 0))
-        x = (size[0] - base.width) // 2
-        y = (size[1] - base.height) // 2
-        canvas.paste(base, (x, y), base)
-
-        tinted = Image.new("RGBA", size, (0, 0, 0, 0))
-        overlay = Image.new("RGBA", size, color)
-        tinted = Image.composite(overlay, tinted, canvas.getchannel("A"))
-        return ctk.CTkImage(light_image=tinted, dark_image=tinted, size=size)
+        image = tk.PhotoImage(
+            master=self,
+            file=str(icon_path),
+            format=f"svg -scaletowidth {size[0]}",
+        )
+        self.svg_images[image_key] = image
+        return image
