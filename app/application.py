@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+import io
+import re
 from pathlib import Path
 
+import cairosvg
 import customtkinter as ctk
 import tkinter as tk
-try:
-    import tksvg
-except ImportError:
-    tksvg = None
+from PIL import Image, ImageTk
 
 from .components.sidebar_menu import SidebarMenu
 from .data.repository import FinanceRepository
@@ -103,25 +103,25 @@ class FinanceDashboardApp(ctk.CTk):
         return icons
 
     def _load_icon(self, filename: str, size: tuple[int, int], color: str) -> object | None:
-        if tksvg is None:
-            return None
-
         icon_path = self.assets_dir / filename
         if not icon_path.exists():
             return None
 
         image_key = f"{filename}:{size[0]}x{size[1]}:{color}"
-        cached_image = self.svg_images.get(image_key)
-        if cached_image is not None:
-            return cached_image
+        cached = self.svg_images.get(image_key)
+        if cached is not None:
+            return cached
 
-        if not getattr(self, "_tksvg_loaded", False):
-            tksvg.load(self)
+        svg_text = icon_path.read_text()
+        svg_text = re.sub(r'stroke="(?!none)[^"]*"', f'stroke="{color}"', svg_text)
+        svg_text = re.sub(r'fill="(?!none)[^"]*"', f'fill="{color}"', svg_text)
 
-        image = tk.PhotoImage(
-            master=self,
-            file=str(icon_path),
-            format=f"svg -scaletowidth {size[0]}",
+        png_bytes = cairosvg.svg2png(
+            bytestring=svg_text.encode(),
+            output_width=size[0],
+            output_height=size[1],
         )
-        self.svg_images[image_key] = image
-        return image
+        pil_image = Image.open(io.BytesIO(png_bytes))
+        tk_image = ImageTk.PhotoImage(pil_image)
+        self.svg_images[image_key] = tk_image
+        return tk_image
