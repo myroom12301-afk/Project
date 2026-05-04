@@ -1,4 +1,4 @@
-from app import FinanceDashboardApp
+from app.application import FinanceDashboardApp
 
 
 

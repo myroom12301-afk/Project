@@ -9,8 +9,8 @@ import customtkinter as ctk
 import tkinter as tk
 from PIL import Image, ImageTk
 
-from .components.sidebar_menu import SidebarMenu
-from .data.repository import FinanceRepository
+from .sidebar import SidebarMenu
+from .repository import FinanceRepository
 from .pages.categories_page import CategoriesPage
 from .pages.dashboard_page import DashboardPage
 from .pages.expense_page import ExpensePage

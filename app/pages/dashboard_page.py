@@ -136,14 +136,14 @@ class DashboardPage(BasePage):
         self.chart_panel = ctk.CTkFrame(bottom, corner_radius=18, fg_color="#202B3C")
         self.chart_panel.grid(row=0, column=1, sticky="nsew")
         self.chart_panel.grid_columnconfigure(0, weight=1)
-        self.chart_panel.grid_rowconfigure(1, weight=1)
+        self.chart_panel.grid_rowconfigure(2, weight=1)
 
         ctk.CTkLabel(
             self.chart_panel,
             text="График доходов и расходов",
             font=ctk.CTkFont(family="Segoe UI", size=18, weight="bold"),
             text_color="#F7F8FC",
-        ).grid(row=0, column=0, sticky="w", padx=18, pady=(18, 10))
+        ).grid(row=0, column=0, sticky="w", padx=18, pady=(18, 2))
 
         self.weekly_total_label = ctk.CTkLabel(
             self.chart_panel,
@@ -151,14 +151,14 @@ class DashboardPage(BasePage):
             font=self.small_font,
             text_color="#D8DEE8",
         )
-        self.weekly_total_label.grid(row=0, column=0, sticky="e", padx=18, pady=(18, 10))
+        self.weekly_total_label.grid(row=1, column=0, sticky="w", padx=18, pady=(0, 10))
 
         self.bar_canvas = tk.Canvas(self.chart_panel, bg="#202B3C", highlightthickness=0)
-        self.bar_canvas.grid(row=1, column=0, sticky="nsew", padx=18, pady=(0, 8))
+        self.bar_canvas.grid(row=2, column=0, sticky="nsew", padx=18, pady=(0, 8))
         self.bar_canvas.bind("<Configure>", lambda _: self._draw_weekly_chart())
 
         legend = ctk.CTkFrame(self.chart_panel, fg_color="transparent")
-        legend.grid(row=2, column=0, pady=(0, 16))
+        legend.grid(row=3, column=0, pady=(0, 16))
         self._legend_item(legend, "#29E073", "Доходы").pack(side="left", padx=12)
         self._legend_item(legend, "#FF613E", "Расходы").pack(side="left", padx=12)
 
@@ -225,7 +225,11 @@ class DashboardPage(BasePage):
         self.controller.sidebar.set_username(summary["username"])
         self.greeting_label.configure(text=f"Hello {summary['username']}")
         self.date_label.configure(text=datetime.now().strftime("%B %d, %Y"))
-        self.balance_value_label.configure(text=self._format_currency(summary["balance"]))
+        balance_text = self._format_currency(summary["balance"])
+        self.balance_value_label.configure(
+            text=balance_text,
+            font=ctk.CTkFont(family="Segoe UI", size=self._balance_font_size(balance_text), weight="bold"),
+        )
 
         self._fill_transactions()
         self._draw_donut(self.income_canvas, "Доходы", summary["income_breakdown"], self.INCOME_COLORS)
@@ -360,7 +364,8 @@ class DashboardPage(BasePage):
             canvas.create_text(x_center, height - 20, text=item["day"], fill="#A9B1C0", font=("Segoe UI", 10))
 
     def _on_add_transaction(self) -> None:
-        return
+        from .transaction_dialog import TransactionDialog
+        TransactionDialog(self, self.controller, on_saved=self.refresh)
 
     def _on_transaction_selected(self, _: object) -> None:
         selected = self.tree.selection()
@@ -371,7 +376,21 @@ class DashboardPage(BasePage):
 
     @staticmethod
     def _format_currency(value: float) -> str:
-        return f"${value:,.0f}"
+        sign = "-" if value < 0 else ""
+        abs_val = abs(value)
+        if abs_val >= 1_000_000_000_000:
+            return f"{sign}${abs_val / 1_000_000_000_000:.1f}Трлн"
+        if abs_val >= 1_000_000_000:
+            return f"{sign}${abs_val / 1_000_000_000:.1f}Млрд"
+        return f"{sign}${abs_val:,.0f}"
+
+    @staticmethod
+    def _balance_font_size(text: str) -> int:
+        n = len(text)
+        if n <= 8:   return 46
+        if n <= 11:  return 36
+        if n <= 14:  return 28
+        return 22
 
     @staticmethod
     def _format_short_date(value: str) -> str:
