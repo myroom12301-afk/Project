@@ -58,6 +58,12 @@ class FinanceRepository:
             self.connection.commit()
         except Exception:
             pass
+        # migrate: add description column
+        try:
+            self.connection.execute("ALTER TABLE categories ADD COLUMN description TEXT DEFAULT ''")
+            self.connection.commit()
+        except Exception:
+            pass
         # migrate: mark seed categories as default if none are marked yet
         unmarked = self.connection.execute(
             "SELECT COUNT(*) FROM categories WHERE is_default = 1"
@@ -190,7 +196,7 @@ class FinanceRepository:
 
     def get_categories(self, user_id: int, tx_type: int | None = None) -> list[sqlite3.Row]:
         query = """
-            SELECT id, name, type, is_default
+            SELECT id, name, type, is_default, description
             FROM categories
             WHERE user_id = ? AND is_active = 1
         """
@@ -201,11 +207,18 @@ class FinanceRepository:
         query += " ORDER BY is_default DESC, name"
         return self.connection.execute(query, params).fetchall()
 
-    def add_category(self, user_id: int, name: str, tx_type: int) -> int:
+    def delete_category(self, category_id: int) -> None:
+        with self.connection:
+            self.connection.execute(
+                "UPDATE categories SET is_active = 0 WHERE id = ?",
+                (category_id,),
+            )
+
+    def add_category(self, user_id: int, name: str, tx_type: int, description: str = "") -> int:
         with self.connection:
             return self.connection.execute(
-                "INSERT INTO categories (user_id, name, type, is_default) VALUES (?, ?, ?, 0)",
-                (user_id, name, tx_type),
+                "INSERT INTO categories (user_id, name, type, is_default, description) VALUES (?, ?, ?, 0, ?)",
+                (user_id, name, tx_type, description),
             ).lastrowid
 
     def get_transactions(self, user_id: int, limit: int = 12) -> list[sqlite3.Row]:

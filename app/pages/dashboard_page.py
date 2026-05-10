@@ -182,6 +182,20 @@ class DashboardPage(BasePage):
             font=("Segoe UI", 11, "bold"),
         )
         style.map("Dashboard.Treeview", background=[("selected", "#294454")], foreground=[("selected", "#FFFFFF")])
+        style.configure(
+            "Dashboard.Vertical.TScrollbar",
+            troughcolor="#202B3C",
+            background="#2A3A50",
+            arrowcolor="#5A6A7E",
+            bordercolor="#202B3C",
+            lightcolor="#202B3C",
+            darkcolor="#202B3C",
+            relief="flat",
+        )
+        style.map(
+            "Dashboard.Vertical.TScrollbar",
+            background=[("active", "#3A4A60"), ("pressed", "#3A4A60")],
+        )
 
         table_wrap = ctk.CTkFrame(self.transactions_panel, fg_color="transparent")
         table_wrap.grid(row=1, column=0, sticky="nsew", padx=18)
@@ -209,7 +223,7 @@ class DashboardPage(BasePage):
         self.tree.grid(row=0, column=0, sticky="nsew")
         self.tree.bind("<<TreeviewSelect>>", self._on_transaction_selected)
 
-        scrollbar = ttk.Scrollbar(table_wrap, orient="vertical", command=self.tree.yview)
+        scrollbar = ttk.Scrollbar(table_wrap, orient="vertical", command=self.tree.yview, style="Dashboard.Vertical.TScrollbar")
         scrollbar.grid(row=0, column=1, sticky="ns")
         self.tree.configure(yscrollcommand=scrollbar.set)
 

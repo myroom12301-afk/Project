@@ -30,7 +30,7 @@ class CategoriesPage(BasePage):
         panel.grid(row=0, column=0, padx=(24, 12), pady=24, sticky="nsew")
         panel.grid_propagate(False)
         panel.grid_columnconfigure(0, weight=1)
-        panel.grid_rowconfigure(5, weight=1)
+        panel.grid_rowconfigure(6, weight=1)
 
         ctk.CTkLabel(
             panel,
@@ -80,6 +80,32 @@ class CategoriesPage(BasePage):
             dropdown_hover_color="#22344E",
         ).grid(row=4, column=0, padx=20, pady=(0, 16), sticky="ew")
 
+        ctk.CTkLabel(
+            panel, text="Описание(опционально)",
+            font=ctk.CTkFont("Segoe UI", 14),
+            text_color="#9BAABF",
+        ).grid(row=5, column=0, padx=20, pady=(0, 6), sticky="w")
+
+        self._desc_textbox = ctk.CTkTextbox(
+            panel,
+            corner_radius=10,
+            fg_color="#1C2A3D",
+            border_color="#2A3A50",
+            border_width=2,
+            text_color="#F7F8FC",
+            scrollbar_button_color="#2A3A50",
+            scrollbar_button_hover_color="#3A4A60",
+        )
+        self._desc_textbox.grid(row=6, column=0, padx=20, pady=(0, 4), sticky="nsew")
+        self._desc_textbox.bind("<KeyRelease>", self._on_desc_change)
+
+        self._desc_counter = ctk.CTkLabel(
+            panel, text="0/30",
+            font=ctk.CTkFont("Segoe UI", 12),
+            text_color="#5A6A7E",
+        )
+        self._desc_counter.grid(row=7, column=0, padx=20, pady=(0, 12), sticky="e")
+
         ctk.CTkButton(
             panel,
             text="+ Добавить категорию",
@@ -90,7 +116,7 @@ class CategoriesPage(BasePage):
             text_color="#32E1B5",
             font=ctk.CTkFont("Segoe UI", 15, weight="bold"),
             command=self._on_add_from_form,
-        ).grid(row=6, column=0, padx=20, pady=(0, 24), sticky="ew")
+        ).grid(row=8, column=0, padx=20, pady=(0, 24), sticky="ew")
 
     # -------------------------------------------------------- categories panel
 
@@ -148,20 +174,8 @@ class CategoriesPage(BasePage):
             scrollbar_button_color="#2A3A50",
             scrollbar_button_hover_color="#3A4A60",
         )
-        scroll.grid(row=1, column=0, padx=4, pady=0, sticky="nsew")
+        scroll.grid(row=1, column=0, padx=4, pady=(0, 12), sticky="nsew")
         scroll.grid_columnconfigure(0, weight=1)
-
-        ctk.CTkButton(
-            container,
-            text="+ Добавить категорию",
-            height=42,
-            corner_radius=10,
-            fg_color="#1C584F",
-            hover_color="#1A4F47",
-            text_color="#32E1B5",
-            font=ctk.CTkFont("Segoe UI", 13, weight="bold"),
-            command=lambda t=tx_type: self._focus_form(t),
-        ).grid(row=2, column=0, padx=12, pady=(8, 12), sticky="ew")
 
         return scroll
 
@@ -230,11 +244,26 @@ class CategoriesPage(BasePage):
     # ---------------------------------------------------------------- actions
 
     def _on_category_click(self, cat) -> None:
-        pass
+        from .category_dialog import CategoryDialog
+        CategoryDialog(
+            self,
+            cat=dict(cat),
+            on_deleted=self._on_category_deleted,
+        )
 
-    def _focus_form(self, tx_type: int) -> None:
-        self._type_var.set(_TYPE_LABEL[tx_type])
-        self._name_entry.focus()
+    def _on_category_deleted(self, category_id: int) -> None:
+        self.controller.repo.delete_category(category_id)
+        self._render_categories()
+
+    def _on_desc_change(self, _event=None) -> None:
+        text = self._desc_textbox.get("1.0", "end-1c")
+        count = len(text)
+        over = count > 30
+        self._desc_counter.configure(
+            text=f"{count}/30",
+            text_color="#E05555" if over else "#5A6A7E",
+        )
+        self._desc_textbox.configure(border_color="#E05555" if over else "#2A3A50")
 
     def _on_add_from_form(self) -> None:
         name = self._name_entry.get().strip()
@@ -243,9 +272,17 @@ class CategoriesPage(BasePage):
             self.after(1200, lambda: self._name_entry.configure(border_color="#2A3A50"))
             return
 
+        desc = self._desc_textbox.get("1.0", "end-1c").strip()
+        if len(desc) > 30:
+            self._desc_textbox.configure(border_color="#E05555")
+            return
+
         tx_type = _LABEL_TYPE[self._type_var.get()]
-        self.controller.repo.add_category(self.controller.user["id"], name, tx_type)
+        self.controller.repo.add_category(self.controller.user["id"], name, tx_type, desc)
         self._name_entry.delete(0, "end")
+        self._desc_textbox.delete("1.0", "end")
+        self._desc_counter.configure(text="0/30", text_color="#5A6A7E")
+        self._desc_textbox.configure(border_color="#2A3A50")
         self._render_categories()
 
     def on_show(self) -> None:
