@@ -30,7 +30,7 @@ class CategoriesPage(BasePage):
         panel.grid(row=0, column=0, padx=(24, 12), pady=24, sticky="nsew")
         panel.grid_propagate(False)
         panel.grid_columnconfigure(0, weight=1)
-        panel.grid_rowconfigure(6, weight=1)
+        panel.grid_rowconfigure(9, weight=1)
 
         ctk.CTkLabel(
             panel,
@@ -46,17 +46,29 @@ class CategoriesPage(BasePage):
             text_color="#9BAABF",
         ).grid(row=1, column=0, padx=20, pady=(0, 6), sticky="w")
 
+        name_wrap = ctk.CTkFrame(panel, fg_color="#1C2A3D", corner_radius=10, height=44)
+        name_wrap.grid(row=2, column=0, padx=20, pady=(0, 16), sticky="ew")
+        name_wrap.grid_propagate(False)
+        name_wrap.grid_columnconfigure(1, weight=1)
+        name_wrap.grid_rowconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            name_wrap,
+            text="✉",
+            fg_color="transparent",
+            text_color="#5A6A7E",
+            font=ctk.CTkFont("Segoe UI", 18),
+        ).grid(row=0, column=0, padx=(12, 4))
+
         self._name_entry = ctk.CTkEntry(
-            panel,
+            name_wrap,
             placeholder_text="Введите название",
-            height=44,
-            corner_radius=10,
-            fg_color="#1C2A3D",
-            border_color="#2A3A50",
+            fg_color="transparent",
+            border_width=0,
             text_color="#F7F8FC",
             placeholder_text_color="#5A6A7E",
         )
-        self._name_entry.grid(row=2, column=0, padx=20, pady=(0, 16), sticky="ew")
+        self._name_entry.grid(row=0, column=1, sticky="ew", padx=(0, 8))
 
         ctk.CTkLabel(
             panel, text="Тип",
@@ -64,21 +76,40 @@ class CategoriesPage(BasePage):
             text_color="#9BAABF",
         ).grid(row=3, column=0, padx=20, pady=(0, 6), sticky="w")
 
+        type_wrap = ctk.CTkFrame(panel, fg_color="#1C2A3D", corner_radius=10, height=44)
+        type_wrap.grid(row=4, column=0, padx=20, pady=(0, 16), sticky="ew")
+        type_wrap.grid_propagate(False)
+        type_wrap.grid_columnconfigure(1, weight=1)
+        type_wrap.grid_rowconfigure(0, weight=1)
+
+        self._type_icons = {
+            "Расходы": self.controller._load_icon("Vector (1).svg", size=(22, 22), color="#5A6A7E"),
+            "Доходы":  self.controller._load_icon("fi-1.svg",        size=(22, 22), color="#5A6A7E"),
+        }
+        self._type_icon_label = ctk.CTkLabel(
+            type_wrap,
+            image=self._type_icons["Расходы"],
+            text="",
+            fg_color="transparent",
+        )
+        self._type_icon_label.grid(row=0, column=0, padx=(10, 4))
+
         self._type_var = ctk.StringVar(value="Расходы")
         ctk.CTkOptionMenu(
-            panel,
+            type_wrap,
             values=["Расходы", "Доходы"],
             variable=self._type_var,
-            height=44,
-            corner_radius=10,
+            command=self._on_type_icon_changed,
+            height=36,
+            corner_radius=8,
             fg_color="#1C2A3D",
-            button_color="#2A3A50",
-            button_hover_color="#334560",
+            button_color="#1C584F",
+            button_hover_color="#1A4F47",
             text_color="#F7F8FC",
             dropdown_fg_color="#1C2A3D",
             dropdown_text_color="#F7F8FC",
             dropdown_hover_color="#22344E",
-        ).grid(row=4, column=0, padx=20, pady=(0, 16), sticky="ew")
+        ).grid(row=0, column=1, sticky="ew", padx=(0, 4), pady=4)
 
         ctk.CTkLabel(
             panel, text="Описание(опционально)",
@@ -88,15 +119,15 @@ class CategoriesPage(BasePage):
 
         self._desc_textbox = ctk.CTkTextbox(
             panel,
+            height=80,
             corner_radius=10,
             fg_color="#1C2A3D",
-            border_color="#2A3A50",
-            border_width=2,
+            border_width=0,
             text_color="#F7F8FC",
             scrollbar_button_color="#2A3A50",
             scrollbar_button_hover_color="#3A4A60",
         )
-        self._desc_textbox.grid(row=6, column=0, padx=20, pady=(0, 4), sticky="nsew")
+        self._desc_textbox.grid(row=6, column=0, padx=20, pady=(0, 4), sticky="ew")
         self._desc_textbox.bind("<KeyRelease>", self._on_desc_change)
 
         self._desc_counter = ctk.CTkLabel(
@@ -104,7 +135,7 @@ class CategoriesPage(BasePage):
             font=ctk.CTkFont("Segoe UI", 12),
             text_color="#5A6A7E",
         )
-        self._desc_counter.grid(row=7, column=0, padx=20, pady=(0, 12), sticky="e")
+        self._desc_counter.grid(row=7, column=0, padx=20, pady=(0, 4), sticky="e")
 
         ctk.CTkButton(
             panel,
@@ -116,7 +147,7 @@ class CategoriesPage(BasePage):
             text_color="#32E1B5",
             font=ctk.CTkFont("Segoe UI", 15, weight="bold"),
             command=self._on_add_from_form,
-        ).grid(row=8, column=0, padx=20, pady=(0, 24), sticky="ew")
+        ).grid(row=8, column=0, padx=20, pady=(0, 16), sticky="ew")
 
     # -------------------------------------------------------- categories panel
 
@@ -254,6 +285,9 @@ class CategoriesPage(BasePage):
     def _on_category_deleted(self, category_id: int) -> None:
         self.controller.repo.delete_category(category_id)
         self._render_categories()
+
+    def _on_type_icon_changed(self, value: str) -> None:
+        self._type_icon_label.configure(image=self._type_icons[value])
 
     def _on_desc_change(self, _event=None) -> None:
         text = self._desc_textbox.get("1.0", "end-1c")
