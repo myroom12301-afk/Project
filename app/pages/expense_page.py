@@ -1,13 +1,8 @@
 from __future__ import annotations
 
-from .placeholder_page import PlaceholderPage
+from .transaction_list_page import EXPENSE, TransactionListPage
 
 
-class ExpensePage(PlaceholderPage):
+class ExpensePage(TransactionListPage):
     def __init__(self, master, controller) -> None:
-        super().__init__(
-            master,
-            controller,
-            title="Расходы",
-            description="Отдельный модуль для логики расходов. Здесь удобно держать таблицы, формы и аналитику именно по тратам.",
-        )
+        super().__init__(master, controller, tx_type=EXPENSE, title="Расходы")

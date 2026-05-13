@@ -1,13 +1,8 @@
 from __future__ import annotations
 
-from .placeholder_page import PlaceholderPage
+from .transaction_list_page import INCOME, TransactionListPage
 
 
-class IncomePage(PlaceholderPage):
+class IncomePage(TransactionListPage):
     def __init__(self, master, controller) -> None:
-        super().__init__(
-            master,
-            controller,
-            title="Доходы",
-            description="Отдельный модуль для логики доходов. Сюда можно переносить формы создания, фильтры и аналитику по поступлениям.",
-        )
+        super().__init__(master, controller, tx_type=INCOME, title="Доходы")

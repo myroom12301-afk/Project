@@ -241,6 +241,63 @@ class FinanceRepository:
             (user_id, limit),
         ).fetchall()
 
+    def get_transactions_for_page(
+        self,
+        user_id: int,
+        tx_type: int,
+        category_id: int | None = None,
+        year: int | None = None,
+        month: int | None = None,
+    ) -> list[sqlite3.Row]:
+        query = """
+            SELECT
+                t.id,
+                t.description,
+                t.type,
+                t.amount / 100.0 AS amount,
+                t.created_at,
+                c.name AS category_name,
+                t.category_id
+            FROM transactions t
+            JOIN categories c ON c.id = t.category_id
+            WHERE t.user_id = ? AND t.type = ?
+        """
+        params: list[int] = [user_id, tx_type]
+        if category_id is not None:
+            query += " AND t.category_id = ?"
+            params.append(category_id)
+        if year is not None and month is not None:
+            query += " AND strftime('%Y', t.created_at) = ? AND strftime('%m', t.created_at) = ?"
+            params.extend([f"{year:04d}", f"{month:02d}"])
+        query += " ORDER BY datetime(t.created_at) DESC, t.id DESC"
+        return self.connection.execute(query, params).fetchall()
+
+    def get_latest_transaction_for_type(self, user_id: int, tx_type: int) -> sqlite3.Row | None:
+        return self.connection.execute(
+            """
+            SELECT created_at
+            FROM transactions
+            WHERE user_id = ? AND type = ?
+            ORDER BY datetime(created_at) DESC, id DESC
+            LIMIT 1
+            """,
+            (user_id, tx_type),
+        ).fetchone()
+
+    def get_transaction_months_for_type(self, user_id: int, tx_type: int) -> list[sqlite3.Row]:
+        return self.connection.execute(
+            """
+            SELECT
+                CAST(strftime('%Y', created_at) AS INTEGER) AS year,
+                CAST(strftime('%m', created_at) AS INTEGER) AS month
+            FROM transactions
+            WHERE user_id = ? AND type = ?
+            GROUP BY strftime('%Y-%m', created_at)
+            ORDER BY strftime('%Y-%m', created_at) DESC
+            """,
+            (user_id, tx_type),
+        ).fetchall()
+
     def get_transaction(self, transaction_id: int) -> sqlite3.Row | None:
         return self.connection.execute(
             """
