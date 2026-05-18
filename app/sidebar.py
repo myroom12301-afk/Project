@@ -11,9 +11,11 @@ class SidebarMenu(tk.Frame):
         on_select,
         icons: dict[str, dict[str, object | None]] | None = None,
         user_icon: object | None = None,
+        display_names: list[str] | None = None,
     ) -> None:
         super().__init__(master, width=250, bg="#11192B", highlightthickness=0, bd=0)
         self.items = items
+        self.display_names = display_names or items
         self.on_select = on_select
         self.icons = icons or {}
         self.user_icon = user_icon
@@ -34,7 +36,7 @@ class SidebarMenu(tk.Frame):
         )
         brand.grid(row=0, column=0, padx=22, pady=(20, 36), sticky="w")
 
-        for index, title in enumerate(self.items, start=1):
+        for index, (title, display) in enumerate(zip(self.items, self.display_names), start=1):
             row = tk.Frame(self, bg="#11192B", highlightthickness=0, bd=0, cursor="hand2")
             row.grid(row=index, column=0, padx=18, pady=8, sticky="ew")
             row.grid_columnconfigure(1, weight=1)
@@ -53,7 +55,7 @@ class SidebarMenu(tk.Frame):
 
             text_label = tk.Label(
                 row,
-                text=title,
+                text=display,
                 bg="#11192B",
                 fg="#7F899A",
                 font=("Segoe UI", 18),
@@ -110,6 +112,11 @@ class SidebarMenu(tk.Frame):
                 fg=text_color,
                 font=font,
             )
+
+    def update_display_names(self, display_names: list[str]) -> None:
+        for title, display in zip(self.items, display_names):
+            if title in self.text_labels:
+                self.text_labels[title].configure(text=display)
 
     def set_username(self, username: str) -> None:
         self.footer_name.configure(text=username)

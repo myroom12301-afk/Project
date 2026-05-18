@@ -9,6 +9,8 @@ import customtkinter as ctk
 import tkinter as tk
 from PIL import Image, ImageTk
 
+from .currencies import get_symbol
+from .locale import locale, t
 from .sidebar import SidebarMenu
 from .repository import FinanceRepository
 from .pages.categories_page import CategoriesPage
@@ -25,6 +27,14 @@ ctk.set_default_color_theme("blue")
 
 class FinanceDashboardApp(ctk.CTk):
     SIDEBAR_ITEMS = ["Обзор", "Конверт", "Доходы", "Расходы", "Категории", "Настройки"]
+    SIDEBAR_ITEM_KEYS = {
+        "Обзор":      "nav.overview",
+        "Конверт":    "nav.transfer",
+        "Доходы":     "nav.income",
+        "Расходы":    "nav.expense",
+        "Категории":  "nav.categories",
+        "Настройки":  "nav.settings",
+    }
     SIDEBAR_ICON_FILES = {
         "Обзор": "gemini-svg.svg",
         "Конверт": "Group 12.svg",
@@ -43,6 +53,10 @@ class FinanceDashboardApp(ctk.CTk):
 
         self.repo = FinanceRepository(Path(__file__).resolve().parent.parent / "finance.db")
         self.user = self.repo.get_default_user()
+        try:
+            locale.set(self.user["language"] or "Русский")
+        except Exception:
+            pass
         self.assets_dir = Path(__file__).resolve().parent.parent / "assets"
         self.svg_images: dict[str, object | None] = {}
         self.sidebar_icons = self._load_sidebar_icons()
@@ -58,6 +72,7 @@ class FinanceDashboardApp(ctk.CTk):
             on_select=self.show_page,
             icons=self.sidebar_icons,
             user_icon=self.user_icon,
+            display_names=[t(self.SIDEBAR_ITEM_KEYS[i]) for i in self.SIDEBAR_ITEMS],
         )
         self.sidebar.grid(row=0, column=0, sticky="nsew")
 
@@ -83,6 +98,22 @@ class FinanceDashboardApp(ctk.CTk):
             page = page_class(self.content, self)
             page.grid(row=0, column=0, sticky="nsew")
             self.pages[name] = page
+
+    def apply_language(self, lang_name: str) -> None:
+        locale.set(lang_name)
+        self.sidebar.update_display_names([t(self.SIDEBAR_ITEM_KEYS[i]) for i in self.SIDEBAR_ITEMS])
+        for page in self.pages.values():
+            page.destroy()
+        self.pages.clear()
+        self._build_pages()
+        self.show_page("Настройки")
+
+    @property
+    def currency_symbol(self) -> str:
+        try:
+            return get_symbol(self.user["currency"] or "USD")
+        except Exception:
+            return "$"
 
     def refresh_user(self) -> None:
         self.user = self.repo.get_default_user()

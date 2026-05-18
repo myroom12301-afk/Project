@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 
@@ -64,6 +64,19 @@ class FinanceRepository:
             self.connection.commit()
         except Exception:
             pass
+        # migrate: add user settings columns
+        for _col_def in [
+            "email TEXT DEFAULT ''",
+            "currency TEXT DEFAULT 'USD'",
+            "language TEXT DEFAULT 'Русский'",
+            "timezone TEXT DEFAULT '(GMT+06:00) Бишкек, Алмата'",
+            "weekly_report INTEGER DEFAULT 0",
+        ]:
+            try:
+                self.connection.execute(f"ALTER TABLE users ADD COLUMN {_col_def}")
+                self.connection.commit()
+            except Exception:
+                pass
         # migrate: mark seed categories as default if none are marked yet
         unmarked = self.connection.execute(
             "SELECT COUNT(*) FROM categories WHERE is_default = 1"
@@ -86,36 +99,19 @@ class FinanceRepository:
                 )
 
     def _ensure_seed_data(self) -> None:
-        stats_row = self.connection.execute(
-            """
-            SELECT
-                (SELECT COUNT(*) FROM users) AS user_count,
-                (SELECT COUNT(*) FROM categories) AS category_count,
-                (SELECT COUNT(*) FROM transactions) AS transaction_count
-            """
+        user_row = self.connection.execute(
+            "SELECT id FROM users ORDER BY id LIMIT 1"
         ).fetchone()
-        if stats_row["user_count"] and stats_row["category_count"] and stats_row["transaction_count"]:
-            user_row = self.connection.execute(
-                "SELECT id FROM users ORDER BY id LIMIT 1"
-            ).fetchone()
+        if user_row:
             self._recalculate_balance(user_row["id"])
             return
+        self._init_fresh_state()
 
-        self.reset_demo_data()
-
-    def reset_demo_data(self) -> None:
-        with self.connection:
-            self.connection.execute("DELETE FROM transactions")
-            self.connection.execute("DELETE FROM categories")
-            self.connection.execute("DELETE FROM users")
-            self.connection.execute(
-                "DELETE FROM sqlite_sequence WHERE name IN ('users', 'categories', 'transactions')"
-            )
-
+    def _init_fresh_state(self) -> None:
         with self.connection:
             user_id = self.connection.execute(
                 "INSERT INTO users (username) VALUES (?)",
-                ("Tanzir Rahman",),
+                ("User",),
             ).lastrowid
 
             categories = [
@@ -133,45 +129,15 @@ class FinanceRepository:
                 categories,
             )
 
-        category_map = {
-            (row["name"], row["type"]): row["id"]
-            for row in self.connection.execute(
-                "SELECT id, name, type FROM categories WHERE user_id = ?",
-                (user_id,),
-            ).fetchall()
-        }
-
-        now = datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)
-        seed_transactions = [
-            ("Зарплата за месяц", "Зарплата", 1, 145000.0, now - timedelta(days=6, hours=1)),
-            ("Проект для клиента", "Фриланс", 1, 42000.0, now - timedelta(days=5, hours=3)),
-            ("Кэшбек банка", "Кэшбек", 1, 2300.0, now - timedelta(days=4, hours=5)),
-            ("Бонус", "Прочее", 1, 18000.0, now - timedelta(days=2, hours=2)),
-            ("Покупка в магазине Globus", "Магазины", 0, 12150.0, now - timedelta(days=6, hours=2)),
-            ("Заправка автомобиля", "АЗС", 0, 6250.0, now - timedelta(days=5, hours=1)),
-            ("Аптека", "Аптека", 0, 4300.0, now - timedelta(days=3, hours=4)),
-            ("Коммунальные платежи", "Прочее", 0, 27000.0, now - timedelta(days=2, hours=1)),
-            ("Покупка техники", "Магазины", 0, 18500.0, now - timedelta(days=1, hours=3)),
-            ("Повторная заправка", "АЗС", 0, 5100.0, now - timedelta(hours=6)),
-        ]
-
+    def reset_demo_data(self) -> None:
         with self.connection:
-            for description, category_name, tx_type, amount, created_at in seed_transactions:
-                self.connection.execute(
-                    """
-                    INSERT INTO transactions (user_id, category_id, type, amount, description, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        user_id,
-                        category_map[(category_name, tx_type)],
-                        tx_type,
-                        int(round(amount * 100)),
-                        description,
-                        created_at.strftime("%Y-%m-%d %H:%M:%S"),
-                    ),
-                )
-        self._recalculate_balance(user_id)
+            self.connection.execute("DELETE FROM transactions")
+            self.connection.execute("DELETE FROM categories")
+            self.connection.execute("DELETE FROM users")
+            self.connection.execute(
+                "DELETE FROM sqlite_sequence WHERE name IN ('users', 'categories', 'transactions')"
+            )
+        self._init_fresh_state()
 
     def _recalculate_balance(self, user_id: int) -> None:
         row = self.connection.execute(
@@ -405,6 +371,24 @@ class FinanceRepository:
             "total_expense": totals_row["expense"],
         }
 
+    def get_all_transactions(self, user_id: int) -> list[sqlite3.Row]:
+        return self.connection.execute(
+            """
+            SELECT
+                t.id,
+                t.description,
+                t.type,
+                t.amount / 100.0 AS amount,
+                t.created_at,
+                c.name AS category_name
+            FROM transactions t
+            JOIN categories c ON c.id = t.category_id
+            WHERE t.user_id = ?
+            ORDER BY datetime(t.created_at) DESC, t.id DESC
+            """,
+            (user_id,),
+        ).fetchall()
+
     def get_weekly_series(self, user_id: int) -> list[dict]:
         rows = self.connection.execute(
             """
@@ -419,22 +403,13 @@ class FinanceRepository:
             (user_id,),
         ).fetchall()
 
-        day_names = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"]
         grouped: dict[int, dict[int, float]] = defaultdict(lambda: {0: 0.0, 1: 0.0})
         for row in rows:
             grouped[int(row["weekday"])][row["type"]] = row["total"] or 0.0
 
         return [
-            {
-                "day": day_names[index],
-                "income": grouped[index][1],
-                "expense": grouped[index][0],
-            }
+            {"day_index": index, "income": grouped[index][1], "expense": grouped[index][0]}
             for index in range(1, 7)
         ] + [
-            {
-                "day": "Вс",
-                "income": grouped[0][1],
-                "expense": grouped[0][0],
-            }
+            {"day_index": 0, "income": grouped[0][1], "expense": grouped[0][0]}
         ]

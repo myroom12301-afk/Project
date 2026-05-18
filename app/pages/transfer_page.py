@@ -5,6 +5,7 @@ from pathlib import Path
 import customtkinter as ctk
 from PIL import Image
 
+from ..locale import t
 from .base_page import BasePage
 
 # Папка assets лежит рядом с корнем проекта
@@ -23,7 +24,7 @@ class TransferPage(BasePage):
 
         ctk.CTkLabel(
             card,
-            text="Пример вставки изображения",
+            text=t("transfer.title"),
             font=ctk.CTkFont(family="Segoe UI", size=26, weight="bold"),
             text_color="#F7F8FC",
         ).pack(anchor="w", padx=28, pady=(28, 16))
@@ -49,7 +50,7 @@ class TransferPage(BasePage):
 
         ctk.CTkLabel(
             card,
-            text="img.png из папки assets",
+            text=t("transfer.subtitle"),
             font=ctk.CTkFont(family="Segoe UI", size=14),
             text_color="#7D8798",
         ).pack(pady=(0, 28))
