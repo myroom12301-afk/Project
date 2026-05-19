@@ -107,7 +107,9 @@
   "settings.clear_desc":   "Аккаунтуңуздагы бардык маалыматтарды жок кылуу",
   "settings.clear_btn":    "Тазалоо",
   "settings.weekly_title": "Жумалык отчёт",
-  "settings.weekly_desc":  "Ар жума сайын финансылык жыйынтык алыңыз",
+  "settings.weekly_desc":  "Учурдагы жумадагы транзакциялар боюнча отчётту жүктөп алыңыз",
+  "settings.weekly_btn":   "Жүктөп алуу",
+  "weekly_report.title":   "Жумалык отчёт",
 
   "edit_profile.title":      "Профилди өзгөртүү",
   "edit_profile.name":       "Аты",
@@ -126,5 +128,27 @@
   "clear.confirm": "Тазалоо",
 
   "transfer.title":    "Сүрөт кыстаруу мисалы",
-  "transfer.subtitle": "assets папкасынан img.png"
+  "transfer.subtitle": "assets папкасынан img.png",
+
+  "converter.title":          "Конвертер",
+  "converter.transfer_title": "Балансга которуу",
+  "converter.transfer_hint":  "Сумма \"Конверт\" категориясына киреше катары балансыңызга кошулат",
+  "converter.transfer_btn":   "Балансга кошуу",
+  "converter.category_name":  "Конверт",
+  "converter.from_lbl":     "валютадан",
+  "converter.to_lbl":       "валютага",
+  "converter.convert_btn":  "+ Конверттөө",
+  "converter.no_rate":      "Курс табылган жок",
+  "converter.history_title":"Конвертация тарыхы",
+  "converter.col_date":     "Дата",
+  "converter.col_from":     "Баштап",
+  "converter.col_to":       "Которуу",
+  "converter.col_rate":     "Курс",
+
+  "rates.title":        "Курстар",
+  "rates.col_currency": "Валюта",
+  "rates.col_rate":     "Курс",
+  "rates.add_btn":      "+ Курс кошуу",
+  "rates.dialog_title": "Курс кошуу",
+  "rates.dialog_add":   "Кошуу"
 }

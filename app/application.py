@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import io
 import re
 from pathlib import Path
@@ -15,10 +13,9 @@ from .sidebar import SidebarMenu
 from .repository import FinanceRepository
 from .pages.categories_page import CategoriesPage
 from .pages.dashboard_page import DashboardPage
-from .pages.expense_page import ExpensePage
-from .pages.income_page import IncomePage
 from .pages.settings_page import SettingsPage
 from .pages.transfer_page import TransferPage
+from .pages.transaction_list_page import TransactionListPage, INCOME, EXPENSE
 
 
 ctk.set_appearance_mode("dark")
@@ -36,12 +33,12 @@ class FinanceDashboardApp(ctk.CTk):
         "Настройки":  "nav.settings",
     }
     SIDEBAR_ICON_FILES = {
-        "Обзор": "gemini-svg.svg",
-        "Конверт": "Group 12.svg",
-        "Доходы": "Vector (1).svg",
-        "Расходы": "fi-1.svg",
-        "Категории": "fi-rr-interactive.svg",
-        "Настройки": "Vector.svg",
+        "Обзор":      "gemini-svg.svg",
+        "Конверт":    "Group 12.svg",
+        "Доходы":     "Vector (1).svg",
+        "Расходы":    "fi-1.svg",
+        "Категории":  "fi-rr-interactive.svg",
+        "Настройки":  "Vector.svg",
     }
 
     def __init__(self) -> None:
@@ -85,17 +82,17 @@ class FinanceDashboardApp(ctk.CTk):
         self.show_page("Обзор")
 
     def _build_pages(self) -> None:
-        page_classes = {
-            "Обзор": DashboardPage,
-            "Конверт": TransferPage,
-            "Доходы": IncomePage,
-            "Расходы": ExpensePage,
-            "Категории": CategoriesPage,
-            "Настройки": SettingsPage,
+        page_factories = {
+            "Обзор":      lambda m, c: DashboardPage(m, c),
+            "Конверт":    lambda m, c: TransferPage(m, c),
+            "Доходы":     lambda m, c: TransactionListPage(m, c, tx_type=INCOME, title_key="nav.income"),
+            "Расходы":    lambda m, c: TransactionListPage(m, c, tx_type=EXPENSE, title_key="nav.expense"),
+            "Категории":  lambda m, c: CategoriesPage(m, c),
+            "Настройки":  lambda m, c: SettingsPage(m, c),
         }
 
-        for name, page_class in page_classes.items():
-            page = page_class(self.content, self)
+        for name, factory in page_factories.items():
+            page = factory(self.content, self)
             page.grid(row=0, column=0, sticky="nsew")
             self.pages[name] = page
 
@@ -129,7 +126,7 @@ class FinanceDashboardApp(ctk.CTk):
         for title, filename in self.SIDEBAR_ICON_FILES.items():
             icons[title] = {
                 "inactive": self._load_icon(filename, size=(22, 22), color="#8B95A5"),
-                "active": self._load_icon(filename, size=(22, 22), color="#22D7AF"),
+                "active":   self._load_icon(filename, size=(22, 22), color="#22D7AF"),
             }
         return icons
 

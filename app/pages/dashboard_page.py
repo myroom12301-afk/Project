@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import math
 import tkinter as tk
 from datetime import datetime
@@ -153,6 +151,8 @@ class DashboardPage(BasePage):
         self.bar_canvas = tk.Canvas(self.chart_panel, bg="#202B3C", highlightthickness=0)
         self.bar_canvas.grid(row=2, column=0, sticky="nsew", padx=18, pady=(0, 8))
         self.bar_canvas.bind("<Configure>", lambda _: self._draw_weekly_chart())
+        self.bar_canvas.bind("<Button-1>", self._on_chart_click)
+        self._bar_zones: list[tuple[float, float, float, float, int]] = []
 
         legend = ctk.CTkFrame(self.chart_panel, fg_color="transparent")
         legend.grid(row=3, column=0, pady=(0, 16))
@@ -314,6 +314,7 @@ class DashboardPage(BasePage):
         group_w = chart_w / max(len(series), 1)
         bar_w = min(18, group_w / 3)
 
+        self._bar_zones = []
         for index, item in enumerate(series):
             x = left_pad + group_w * index + group_w / 2
             ih = 0 if max_value == 0 else (item["income"] / max_value) * chart_h
@@ -322,6 +323,76 @@ class DashboardPage(BasePage):
             canvas.create_rectangle(x + 3, base_y - eh, x + bar_w + 3, base_y, fill="#FF613E", width=0)
             canvas.create_text(x, height - 20, text=t(f"day.{item['day_index']}"),
                                fill="#A9B1C0", font=("Segoe UI", 10))
+            self._bar_zones.append((
+                left_pad + group_w * index,
+                left_pad + group_w * (index + 1),
+                item["income"],
+                item["expense"],
+                item["day_index"],
+            ))
+
+    def _on_chart_click(self, event: tk.Event) -> None:
+        canvas = self.bar_canvas
+        canvas.delete("tooltip")
+        for x_min, x_max, income, expense, day_index in self._bar_zones:
+            if x_min <= event.x <= x_max:
+                self._draw_chart_tooltip(canvas, event.x, event.y, income, expense, day_index)
+                return
+
+    def _draw_chart_tooltip(
+        self,
+        canvas: tk.Canvas,
+        cx: float,
+        cy: float,
+        income: float,
+        expense: float,
+        day_index: int,
+    ) -> None:
+        sym = self.controller.currency_symbol
+        income_str = f"+{income:,.0f} {sym}"
+        expense_str = f"-{expense:,.0f} {sym}"
+        day_name = t(f"day.{day_index}")
+
+        pad_x, pad_y = 14, 10
+        line_h = 30
+        box_w = 230
+        box_h = pad_y * 2 + line_h * 2 + 8
+
+        canvas_w = canvas.winfo_width()
+        canvas_h = canvas.winfo_height()
+        bx = min(cx + 12, canvas_w - box_w - 4)
+        by = max(cy - box_h - 12, 4)
+        if bx < 4:
+            bx = 4
+
+        r = 8
+        canvas.create_polygon(
+            bx + r, by,
+            bx + box_w - r, by,
+            bx + box_w, by + r,
+            bx + box_w, by + box_h - r,
+            bx + box_w - r, by + box_h,
+            bx + r, by + box_h,
+            bx, by + box_h - r,
+            bx, by + r,
+            smooth=True, fill="#1A2435", outline="#3D5068", width=1, tags="tooltip",
+        )
+
+        y1 = by + pad_y + line_h // 2
+        y2 = by + pad_y + line_h + line_h // 2 + 4
+
+        canvas.create_text(bx + pad_x, by + pad_y - 2, text=day_name,
+                           fill="#6B7A8E", font=("Segoe UI", 10), anchor="nw", tags="tooltip")
+
+        canvas.create_text(bx + pad_x, y1, text=t("common.expense"),
+                           fill="#C8D0DC", font=("Segoe UI", 12), anchor="w", tags="tooltip")
+        canvas.create_text(bx + box_w - pad_x, y1, text=expense_str,
+                           fill="#FF613E", font=("Segoe UI", 12, "bold"), anchor="e", tags="tooltip")
+
+        canvas.create_text(bx + pad_x, y2, text=t("common.income"),
+                           fill="#C8D0DC", font=("Segoe UI", 12), anchor="w", tags="tooltip")
+        canvas.create_text(bx + box_w - pad_x, y2, text=income_str,
+                           fill="#29E073", font=("Segoe UI", 12, "bold"), anchor="e", tags="tooltip")
 
     def _on_add_transaction(self) -> None:
         from .transaction_dialog import TransactionDialog

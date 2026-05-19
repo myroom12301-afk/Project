@@ -1,12 +1,7 @@
-from __future__ import annotations
-
 import customtkinter as ctk
 
 from ..locale import t
-from .base_page import BasePage
-
-EXPENSE = 0
-INCOME = 1
+from .base_page import BasePage, EXPENSE, INCOME
 
 
 class CategoriesPage(BasePage):

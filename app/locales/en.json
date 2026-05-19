@@ -107,7 +107,9 @@
   "settings.clear_desc":   "Delete all data from your account",
   "settings.clear_btn":    "Clear",
   "settings.weekly_title": "Weekly Report",
-  "settings.weekly_desc":  "Receive a weekly summary of your finances",
+  "settings.weekly_desc":  "Download a report of this week's transactions",
+  "settings.weekly_btn":   "Download",
+  "weekly_report.title":   "Weekly Report",
 
   "edit_profile.title":      "Edit Profile",
   "edit_profile.name":       "Name",
@@ -126,5 +128,27 @@
   "clear.confirm": "Clear",
 
   "transfer.title":    "Image insertion example",
-  "transfer.subtitle": "img.png from the assets folder"
+  "transfer.subtitle": "img.png from the assets folder",
+
+  "converter.title":          "Converter",
+  "converter.transfer_title": "Transfer to Balance",
+  "converter.transfer_hint":  "The amount will be added to your balance as income in the \"Envelope\" category",
+  "converter.transfer_btn":   "Add to Balance",
+  "converter.category_name":  "Envelope",
+  "converter.from_lbl":     "from currency",
+  "converter.to_lbl":       "to currency",
+  "converter.convert_btn":  "+ Convert",
+  "converter.no_rate":      "Rate not found",
+  "converter.history_title":"Conversion History",
+  "converter.col_date":     "Date",
+  "converter.col_from":     "From",
+  "converter.col_to":       "To",
+  "converter.col_rate":     "Rate",
+
+  "rates.title":        "Rates",
+  "rates.col_currency": "Currency",
+  "rates.col_rate":     "Rate",
+  "rates.add_btn":      "+ Add Rate",
+  "rates.dialog_title": "Add Rate",
+  "rates.dialog_add":   "Add"
 }

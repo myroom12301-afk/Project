@@ -1,16 +1,15 @@
-from __future__ import annotations
-
 import csv
 import json
 import tkinter.filedialog as filedialog
 import tkinter.messagebox as messagebox
 import zoneinfo
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import customtkinter as ctk
 
 from ..currencies import CURRENCIES as CURRENCY_DATA, get_all as get_all_currencies, _DEFAULT_CODE
 from ..locale import t
+from .base_dialog import BaseDialog
 from .base_page import BasePage
 
 LANGUAGES = ["Русский", "English", "Кыргызча"]
@@ -33,27 +32,12 @@ _MENU_STYLE = dict(
 
 # ──────────────────────────────────────────────────────────────────── dialogs ──
 
-class EditProfileDialog(ctk.CTkToplevel):
+class EditProfileDialog(BaseDialog):
     def __init__(self, master, user, on_saved=None) -> None:
-        super().__init__(master)
         self._user = user
         self._on_saved = on_saved
-        self.title("")
-        self.geometry("360x290")
-        self.resizable(False, False)
-        self.configure(fg_color="#0E1726")
-        self.lift()
-        self.focus_force()
-        self.after(50, self._center)
-        self.after(50, self.grab_set)
-        self.grid_columnconfigure(0, weight=1)
+        super().__init__(master, 360, 290)
         self._build()
-
-    def _center(self) -> None:
-        self.update_idletasks()
-        p = self.master.winfo_toplevel()
-        w, h = 360, 290
-        self.geometry(f"{w}x{h}+{p.winfo_rootx()+(p.winfo_width()-w)//2}+{p.winfo_rooty()+(p.winfo_height()-h)//2}")
 
     def _build(self) -> None:
         ctk.CTkLabel(self, text=t("edit_profile.title"),
@@ -99,29 +83,16 @@ class EditProfileDialog(ctk.CTkToplevel):
         self.destroy()
 
 
-class ExportDialog(ctk.CTkToplevel):
-    def __init__(self, master, controller) -> None:
-        super().__init__(master)
+class ExportDialog(BaseDialog):
+    def __init__(self, master, controller, weekly: bool = False) -> None:
         self._ctl = controller
-        self.title("")
-        self.geometry("300x230")
-        self.resizable(False, False)
-        self.configure(fg_color="#0E1726")
-        self.lift()
-        self.focus_force()
-        self.after(50, self._center)
-        self.after(50, self.grab_set)
-        self.grid_columnconfigure(0, weight=1)
+        self._weekly = weekly
+        super().__init__(master, 300, 230)
         self._build()
 
-    def _center(self) -> None:
-        self.update_idletasks()
-        p = self.master.winfo_toplevel()
-        w, h = 300, 230
-        self.geometry(f"{w}x{h}+{p.winfo_rootx()+(p.winfo_width()-w)//2}+{p.winfo_rooty()+(p.winfo_height()-h)//2}")
-
     def _build(self) -> None:
-        ctk.CTkLabel(self, text=t("export.title"),
+        title_key = "weekly_report.title" if self._weekly else "export.title"
+        ctk.CTkLabel(self, text=t(title_key),
                      font=ctk.CTkFont("Segoe UI", 18, weight="bold"), text_color="#C8CDD8",
                      ).grid(row=0, column=0, padx=24, pady=(24, 6), sticky="w")
         ctk.CTkLabel(self, text=t("export.choose"),
@@ -132,17 +103,25 @@ class ExportDialog(ctk.CTkToplevel):
                           fg_color="#1C2A3D", hover_color="#22344E",
                           text_color="#F7F8FC", font=ctk.CTkFont("Segoe UI", 14),
                           command=lambda f=fmt: self._run(f),
-                          ).grid(row=2+i, column=0, padx=24, pady=4, sticky="ew")
+                          ).grid(row=2 + i, column=0, padx=24, pady=4, sticky="ew")
 
     def _run(self, fmt: str) -> None:
+        if self._weekly:
+            today = datetime.now()
+            week_start = (today - timedelta(days=today.weekday())).strftime("%d.%m")
+            default_name = f"week_{week_start}-{today.strftime('%d.%m.%Y')}"
+            rows = self._ctl.repo.get_weekly_transactions(self._ctl.user["id"])
+        else:
+            default_name = f"finebank_{datetime.now().strftime('%Y%m%d')}"
+            rows = self._ctl.repo.get_all_transactions(self._ctl.user["id"])
+
         type_map = {"csv": [("CSV", "*.csv")], "json": [("JSON", "*.json")], "xlsx": [("Excel", "*.xlsx")]}
         path = filedialog.asksaveasfilename(
             defaultextension=f".{fmt}", filetypes=type_map[fmt],
-            initialfile=f"finebank_{datetime.now().strftime('%Y%m%d')}",
+            initialfile=default_name,
         )
         if not path:
             return
-        rows = self._ctl.repo.get_all_transactions(self._ctl.user["id"])
         if fmt == "csv":
             self._to_csv(path, rows)
         elif fmt == "json":
@@ -185,26 +164,11 @@ class ExportDialog(ctk.CTkToplevel):
         wb.save(path)
 
 
-class ConfirmClearDialog(ctk.CTkToplevel):
+class ConfirmClearDialog(BaseDialog):
     def __init__(self, master, on_confirmed=None) -> None:
-        super().__init__(master)
         self._cb = on_confirmed
-        self.title("")
-        self.geometry("340x200")
-        self.resizable(False, False)
-        self.configure(fg_color="#0E1726")
-        self.lift()
-        self.focus_force()
-        self.after(50, self._center)
-        self.after(50, self.grab_set)
-        self.grid_columnconfigure(0, weight=1)
+        super().__init__(master, 340, 200)
         self._build()
-
-    def _center(self) -> None:
-        self.update_idletasks()
-        p = self.master.winfo_toplevel()
-        w, h = 340, 200
-        self.geometry(f"{w}x{h}+{p.winfo_rootx()+(p.winfo_width()-w)//2}+{p.winfo_rooty()+(p.winfo_height()-h)//2}")
 
     def _build(self) -> None:
         ctk.CTkLabel(self, text=t("clear.title"),
@@ -233,28 +197,13 @@ class ConfirmClearDialog(ctk.CTkToplevel):
 
 # ──────────────────────────────────────────────────────── currency picker ──
 
-class CurrencyPickerDialog(ctk.CTkToplevel):
+class CurrencyPickerDialog(BaseDialog):
     def __init__(self, master, current: str, on_selected=None) -> None:
-        super().__init__(master)
         self._on_selected = on_selected
         self._all = get_all_currencies()
-        self.title("")
-        self.geometry("400x460")
-        self.resizable(False, False)
-        self.configure(fg_color="#0E1726")
-        self.lift()
-        self.focus_force()
-        self.after(50, self._center)
-        self.after(50, self.grab_set)
-        self.grid_columnconfigure(0, weight=1)
+        super().__init__(master, 400, 460)
         self.grid_rowconfigure(1, weight=1)
         self._build(current)
-
-    def _center(self) -> None:
-        self.update_idletasks()
-        p = self.master.winfo_toplevel()
-        w, h = 400, 460
-        self.geometry(f"{w}x{h}+{p.winfo_rootx()+(p.winfo_width()-w)//2}+{p.winfo_rooty()+(p.winfo_height()-h)//2}")
 
     def _build(self, current: str) -> None:
         self._search_var = ctk.StringVar()
@@ -318,28 +267,13 @@ class CurrencyPickerDialog(ctk.CTkToplevel):
 
 # ──────────────────────────────────────────────────────── timezone picker ──
 
-class TimezonePickerDialog(ctk.CTkToplevel):
+class TimezonePickerDialog(BaseDialog):
     def __init__(self, master, current: str, on_selected=None) -> None:
-        super().__init__(master)
         self._on_selected = on_selected
         self._all_zones = _ALL_ZONES
-        self.title("")
-        self.geometry("360x440")
-        self.resizable(False, False)
-        self.configure(fg_color="#0E1726")
-        self.lift()
-        self.focus_force()
-        self.after(50, self._center)
-        self.after(50, self.grab_set)
-        self.grid_columnconfigure(0, weight=1)
+        super().__init__(master, 360, 440)
         self.grid_rowconfigure(1, weight=1)
         self._build(current)
-
-    def _center(self) -> None:
-        self.update_idletasks()
-        p = self.master.winfo_toplevel()
-        w, h = 360, 440
-        self.geometry(f"{w}x{h}+{p.winfo_rootx()+(p.winfo_width()-w)//2}+{p.winfo_rooty()+(p.winfo_height()-h)//2}")
 
     def _build(self, current: str) -> None:
         self._search_var = ctk.StringVar()
@@ -414,8 +348,6 @@ class SettingsPage(BasePage):
         self._scroll.grid_columnconfigure(0, weight=1)
         self._build_profile_card()
         self._build_data_card()
-
-    # ── profile card ──────────────────────────────────────────────────────────
 
     def _build_profile_card(self) -> None:
         card = ctk.CTkFrame(self._scroll, fg_color="#151F2E", corner_radius=16)
@@ -503,8 +435,6 @@ class SettingsPage(BasePage):
                       command=self._save_settings,
                       ).grid(row=11, column=0, padx=20, pady=(4, 18), sticky="w")
 
-    # ── data card ─────────────────────────────────────────────────────────────
-
     def _build_data_card(self) -> None:
         card = ctk.CTkFrame(self._scroll, fg_color="#151F2E", corner_radius=16)
         card.grid(row=1, column=0, sticky="ew", pady=(0, 16))
@@ -535,26 +465,13 @@ class SettingsPage(BasePage):
 
         ctk.CTkFrame(card, height=1, fg_color="#263041").grid(row=5, column=0, sticky="ew", padx=20)
 
-        wr = ctk.CTkFrame(card, fg_color="transparent")
-        wr.grid(row=6, column=0, sticky="ew", padx=20, pady=(12, 18))
-        wr.grid_columnconfigure(1, weight=1)
-
-        ctk.CTkLabel(wr, text="📊", font=ctk.CTkFont("Segoe UI", 20), text_color="#3FC2A3",
-                     ).grid(row=0, column=0, rowspan=2, padx=(0, 14))
-        ctk.CTkLabel(wr, text=t("settings.weekly_title"),
-                     font=ctk.CTkFont("Segoe UI", 14, weight="bold"), text_color="#EDF2FA",
-                     ).grid(row=0, column=1, sticky="w")
-        ctk.CTkLabel(wr, text=t("settings.weekly_desc"),
-                     font=ctk.CTkFont("Segoe UI", 12), text_color="#7F899A",
-                     ).grid(row=1, column=1, sticky="w")
-
-        self._weekly_switch = ctk.CTkSwitch(
-            wr, text="", onvalue=1, offvalue=0,
-            button_color="#32E1B5", button_hover_color="#28C4A0",
-            progress_color="#1C584F",
-            command=self._save_weekly_report,
-        )
-        self._weekly_switch.grid(row=0, column=2, rowspan=2)
+        self._action_row(card, row=6,
+                         icon="📊",
+                         title=t("settings.weekly_title"),
+                         desc=t("settings.weekly_desc"),
+                         btn_text=t("settings.weekly_btn"),
+                         btn_fg="#1C2A3D", btn_hover="#22344E", btn_color="#A4AFBE",
+                         command=self._open_weekly_report)
 
     @staticmethod
     def _action_row(parent, row: int, icon: str, title: str, desc: str,
@@ -595,30 +512,15 @@ class SettingsPage(BasePage):
     def _save_settings(self) -> None:
         repo     = self.controller.repo
         user_id  = self.controller.user["id"]
-        currency = self._currency_code
-        language = self._language_var.get()
-        timezone = self._timezone_var.get()
         with repo.connection:
             repo.connection.execute(
                 "UPDATE users SET currency = ?, language = ?, timezone = ? WHERE id = ?",
-                (currency, language, timezone, user_id),
+                (self._currency_code, self._language_var.get(), self._timezone_var.get(), user_id),
             )
-        self.controller.apply_language(language)
-
-    def _save_weekly_report(self) -> None:
-        repo = self.controller.repo
-        user_id = self.controller.user["id"]
-        with repo.connection:
-            repo.connection.execute(
-                "UPDATE users SET weekly_report = ? WHERE id = ?",
-                (self._weekly_switch.get(), user_id),
-            )
+        self.controller.apply_language(self._language_var.get())
 
     def _open_currency_picker(self) -> None:
-        CurrencyPickerDialog(
-            self, self._currency_code,
-            on_selected=self._on_currency_selected,
-        )
+        CurrencyPickerDialog(self, self._currency_code, on_selected=self._on_currency_selected)
 
     def _on_currency_selected(self, code: str) -> None:
         self._currency_code = code
@@ -627,15 +529,14 @@ class SettingsPage(BasePage):
     @staticmethod
     def _currency_label(code: str) -> str:
         info = CURRENCY_DATA.get(code, {})
-        sym = info.get("symbol", code)
-        name = info.get("name", "")
-        return f"{sym}  {code}  —  {name}"
+        return f"{info.get('symbol', code)}  {code}  —  {info.get('name', '')}"
 
     def _open_timezone_picker(self) -> None:
-        TimezonePickerDialog(
-            self, self._timezone_var.get(),
-            on_selected=lambda z: self._timezone_var.set(z),
-        )
+        TimezonePickerDialog(self, self._timezone_var.get(),
+                             on_selected=lambda z: self._timezone_var.set(z))
+
+    def _open_weekly_report(self) -> None:
+        ExportDialog(self, self.controller, weekly=True)
 
     def _open_export(self) -> None:
         ExportDialog(self, self.controller)
@@ -671,15 +572,10 @@ class SettingsPage(BasePage):
             currency = user["currency"] or _DEFAULT_CODE
             language = user["language"] or "Русский"
             timezone = user["timezone"] or _DEFAULT_ZONE
-            weekly   = user["weekly_report"] or 0
         except Exception:
-            currency, language, timezone, weekly = _DEFAULT_CODE, "Русский", _DEFAULT_ZONE, 0
+            currency, language, timezone = _DEFAULT_CODE, "Русский", _DEFAULT_ZONE
 
         self._currency_code = currency if currency in CURRENCY_DATA else _DEFAULT_CODE
         self._currency_display.set(self._currency_label(self._currency_code))
         self._language_var.set(language if language in LANGUAGES else LANGUAGES[0])
         self._timezone_var.set(timezone if timezone in _ALL_ZONES else _DEFAULT_ZONE)
-        if weekly:
-            self._weekly_switch.select()
-        else:
-            self._weekly_switch.deselect()

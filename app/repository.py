@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 import sqlite3
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 
@@ -49,6 +47,26 @@ class FinanceRepository:
 
             CREATE INDEX IF NOT EXISTS idx_transactions_created_at
                 ON transactions(created_at);
+
+            CREATE TABLE IF NOT EXISTS exchange_rates (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                from_currency TEXT NOT NULL,
+                to_currency   TEXT NOT NULL,
+                rate          REAL NOT NULL,
+                created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS conversion_history (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                from_amount   REAL NOT NULL,
+                from_currency TEXT NOT NULL,
+                to_amount     REAL NOT NULL,
+                to_currency   TEXT NOT NULL,
+                rate          REAL NOT NULL,
+                created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
             """
         )
         self.connection.commit()
@@ -104,8 +122,37 @@ class FinanceRepository:
         ).fetchone()
         if user_row:
             self._recalculate_balance(user_row["id"])
+            self._seed_exchange_rates(user_row["id"])
             return
         self._init_fresh_state()
+
+    def _seed_exchange_rates(self, user_id: int) -> None:
+        # trim to 5 if somehow more exist
+        rows = self.connection.execute(
+            "SELECT id FROM exchange_rates WHERE user_id = ? ORDER BY id", (user_id,)
+        ).fetchall()
+        if len(rows) > 5:
+            excess_ids = [r["id"] for r in rows[5:]]
+            with self.connection:
+                self.connection.execute(
+                    f"DELETE FROM exchange_rates WHERE id IN ({','.join('?' * len(excess_ids))})",
+                    excess_ids,
+                )
+            rows = rows[:5]
+        if len(rows) > 0:
+            return
+        seed = [
+            (user_id, "USD", "KGS", 84.20),
+            (user_id, "EUR", "KGS", 92.50),
+            (user_id, "RUB", "KGS", 0.93),
+            (user_id, "CNY", "KGS", 11.60),
+            (user_id, "TRY", "KGS", 2.45),
+        ]
+        with self.connection:
+            self.connection.executemany(
+                "INSERT INTO exchange_rates (user_id, from_currency, to_currency, rate) VALUES (?, ?, ?, ?)",
+                seed,
+            )
 
     def _init_fresh_state(self) -> None:
         with self.connection:
@@ -148,7 +195,8 @@ class FinanceRepository:
             WHERE user_id = ?
             """,
             (user_id,),
-        ).fetchone()
+        ).fetchone(
+        )
         with self.connection:
             self.connection.execute(
                 "UPDATE users SET balance = ? WHERE id = ?",
@@ -388,6 +436,86 @@ class FinanceRepository:
             """,
             (user_id,),
         ).fetchall()
+
+    def get_weekly_transactions(self, user_id: int) -> list[sqlite3.Row]:
+        today = datetime.now()
+        week_start = today - timedelta(days=today.weekday())
+        week_start_str = week_start.strftime("%Y-%m-%d")
+        return self.connection.execute(
+            """
+            SELECT
+                t.id,
+                t.description,
+                t.type,
+                t.amount / 100.0 AS amount,
+                t.created_at,
+                c.name AS category_name
+            FROM transactions t
+            JOIN categories c ON c.id = t.category_id
+            WHERE t.user_id = ? AND date(t.created_at) >= date(?)
+            ORDER BY datetime(t.created_at) DESC, t.id DESC
+            """,
+            (user_id, week_start_str),
+        ).fetchall()
+
+    def get_exchange_rates(self, user_id: int) -> list[sqlite3.Row]:
+        return self.connection.execute(
+            "SELECT * FROM exchange_rates WHERE user_id = ? ORDER BY id",
+            (user_id,),
+        ).fetchall()
+
+    def add_exchange_rate(self, user_id: int, from_currency: str, to_currency: str, rate: float) -> int:
+        with self.connection:
+            return self.connection.execute(
+                "INSERT INTO exchange_rates (user_id, from_currency, to_currency, rate) VALUES (?, ?, ?, ?)",
+                (user_id, from_currency, to_currency, rate),
+            ).lastrowid
+
+    def update_exchange_rate(self, rate_id: int, rate: float) -> None:
+        with self.connection:
+            self.connection.execute(
+                "UPDATE exchange_rates SET rate = ? WHERE id = ?", (rate, rate_id)
+            )
+
+    def delete_exchange_rate(self, rate_id: int) -> None:
+        with self.connection:
+            self.connection.execute("DELETE FROM exchange_rates WHERE id = ?", (rate_id,))
+
+    def get_or_create_system_category(self, user_id: int, name: str, tx_type: int) -> int:
+        row = self.connection.execute(
+            "SELECT id FROM categories WHERE user_id = ? AND name = ? AND type = ? AND is_active = 1 LIMIT 1",
+            (user_id, name, tx_type),
+        ).fetchone()
+        if row:
+            return row["id"]
+        with self.connection:
+            return self.connection.execute(
+                "INSERT INTO categories (user_id, name, type, is_default, description) VALUES (?, ?, ?, 0, '')",
+                (user_id, name, tx_type),
+            ).lastrowid
+
+    def get_conversion_history(self, user_id: int, limit: int = 50) -> list[sqlite3.Row]:
+        return self.connection.execute(
+            "SELECT * FROM conversion_history WHERE user_id = ? ORDER BY id DESC LIMIT ?",
+            (user_id, limit),
+        ).fetchall()
+
+    def save_conversion(
+        self,
+        user_id: int,
+        from_amount: float,
+        from_currency: str,
+        to_amount: float,
+        to_currency: str,
+        rate: float,
+    ) -> None:
+        with self.connection:
+            self.connection.execute(
+                """INSERT INTO conversion_history
+                   (user_id, from_amount, from_currency, to_amount, to_currency, rate)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (user_id, from_amount, from_currency, to_amount, to_currency, rate),
+            )
 
     def get_weekly_series(self, user_id: int) -> list[dict]:
         rows = self.connection.execute(

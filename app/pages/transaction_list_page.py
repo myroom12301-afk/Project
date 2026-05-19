@@ -1,39 +1,20 @@
-from __future__ import annotations
-
 from datetime import datetime
 
 import customtkinter as ctk
 
 from ..locale import t
-from .base_page import BasePage
-
-EXPENSE = 0
-INCOME = 1
+from .base_dialog import BaseDialog
+from .base_page import BasePage, EXPENSE, INCOME
 
 
-class MonthPickerDialog(ctk.CTkToplevel):
+class MonthPickerDialog(BaseDialog):
     def __init__(self, master, year: int, selected_month: int, on_select) -> None:
-        super().__init__(master)
         self._year = year
         self._selected_month = selected_month
         self._on_select = on_select
-
-        self.title("")
-        self.geometry("300x248")
-        self.resizable(False, False)
-        self.configure(fg_color="#0E1726")
-        self.lift()
-        self.focus_force()
-        self.after(50, self._center)
-        self.after(50, self.grab_set)
-        self.grid_columnconfigure((0, 1), weight=1)
+        super().__init__(master, 300, 248)
+        self.grid_columnconfigure(1, weight=1)
         self._build()
-
-    def _center(self) -> None:
-        self.update_idletasks()
-        p = self.master.winfo_toplevel()
-        w, h = 300, 248
-        self.geometry(f"{w}x{h}+{p.winfo_rootx() + (p.winfo_width() - w) // 2}+{p.winfo_rooty() + (p.winfo_height() - h) // 2}")
 
     def _build(self) -> None:
         ctk.CTkLabel(self, text=str(self._year),

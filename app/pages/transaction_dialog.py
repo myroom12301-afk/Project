@@ -1,11 +1,8 @@
-from __future__ import annotations
-
 import customtkinter as ctk
 
 from ..locale import t
-
-EXPENSE = 0
-INCOME = 1
+from .base_dialog import BaseDialog
+from .base_page import EXPENSE, INCOME
 
 _ENTRY_STYLE = dict(
     height=44, corner_radius=8,
@@ -31,28 +28,12 @@ def _bordered_menu(parent, row: int, **menu_kwargs) -> ctk.CTkOptionMenu:
     return menu
 
 
-class TransactionDialog(ctk.CTkToplevel):
+class TransactionDialog(BaseDialog):
     def __init__(self, master, controller, on_saved=None) -> None:
-        super().__init__(master)
         self.controller = controller
         self.on_saved = on_saved
-
-        self.title("")
-        self.geometry("380x460")
-        self.resizable(False, False)
-        self.configure(fg_color="#0E1726")
-        self.lift()
-        self.focus_force()
-        self.after(50, self._center)
-        self.after(50, self.grab_set)
-        self.grid_columnconfigure(0, weight=1)
+        super().__init__(master, 380, 460)
         self._build()
-
-    def _center(self) -> None:
-        self.update_idletasks()
-        p = self.master.winfo_toplevel()
-        w, h = 380, 460
-        self.geometry(f"{w}x{h}+{p.winfo_rootx() + (p.winfo_width() - w) // 2}+{p.winfo_rooty() + (p.winfo_height() - h) // 2}")
 
     def _label(self, row: int, text: str) -> None:
         ctk.CTkLabel(self, text=text,

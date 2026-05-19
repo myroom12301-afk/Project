@@ -106,8 +106,10 @@
   "settings.clear_title":   "Очистить данные",
   "settings.clear_desc":    "Удалить все данные с вашего аккаунта",
   "settings.clear_btn":     "Очистить",
-  "settings.weekly_title":  "Еженедельный отчёт",
-  "settings.weekly_desc":   "Получать сводку ваших финансов каждую неделю",
+  "settings.weekly_title":  "Недельный отчёт",
+  "settings.weekly_desc":   "Скачать отчёт по транзакциям за текущую неделю",
+  "settings.weekly_btn":    "Скачать",
+  "weekly_report.title":    "Отчёт за неделю",
 
   "edit_profile.title":      "Редактировать профиль",
   "edit_profile.name":       "Имя",
@@ -126,5 +128,27 @@
   "clear.confirm": "Очистить",
 
   "transfer.title":    "Пример вставки изображения",
-  "transfer.subtitle": "img.png из папки assets"
+  "transfer.subtitle": "img.png из папки assets",
+
+  "converter.title":          "Конвертер",
+  "converter.transfer_title": "Перевод в баланс",
+  "converter.transfer_hint":  "Сумма будет добавлена в баланс как доход в категории \"Конверт\"",
+  "converter.transfer_btn":   "Добавить в баланс",
+  "converter.category_name":  "Конверт",
+  "converter.from_lbl":     "из валюты",
+  "converter.to_lbl":       "в валюту",
+  "converter.convert_btn":  "+ Конвертировать",
+  "converter.no_rate":      "Курс не найден",
+  "converter.history_title":"История Конвертаций",
+  "converter.col_date":     "Дата",
+  "converter.col_from":     "Из",
+  "converter.col_to":       "В",
+  "converter.col_rate":     "Курс",
+
+  "rates.title":        "Курсы",
+  "rates.col_currency": "Валюта",
+  "rates.col_rate":     "Курс",
+  "rates.add_btn":      "+ Добавить курс",
+  "rates.dialog_title": "Добавить курс",
+  "rates.dialog_add":   "Добавить"
 }

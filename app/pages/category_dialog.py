@@ -1,32 +1,15 @@
-from __future__ import annotations
-
 import customtkinter as ctk
 
 from ..locale import t
+from .base_dialog import BaseDialog
 
 
-class CategoryDialog(ctk.CTkToplevel):
+class CategoryDialog(BaseDialog):
     def __init__(self, master, cat: dict, on_deleted=None) -> None:
-        super().__init__(master)
         self._cat = cat
         self._on_deleted = on_deleted
-
-        self.title("")
-        self.geometry("340x260")
-        self.resizable(False, False)
-        self.configure(fg_color="#0E1726")
-        self.lift()
-        self.focus_force()
-        self.after(50, self._center)
-        self.after(50, self.grab_set)
-        self.grid_columnconfigure(0, weight=1)
+        super().__init__(master, 340, 260)
         self._build()
-
-    def _center(self) -> None:
-        self.update_idletasks()
-        p = self.master.winfo_toplevel()
-        w, h = 340, 260
-        self.geometry(f"{w}x{h}+{p.winfo_rootx() + (p.winfo_width() - w) // 2}+{p.winfo_rooty() + (p.winfo_height() - h) // 2}")
 
     def _build(self) -> None:
         name = self._cat["name"]

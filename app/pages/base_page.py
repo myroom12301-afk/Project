@@ -1,6 +1,7 @@
-from __future__ import annotations
-
 import customtkinter as ctk
+
+EXPENSE = 0
+INCOME = 1
 
 
 class BasePage(ctk.CTkFrame):
